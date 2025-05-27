@@ -3,8 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brain.js AI Chatbot</title>
+    <title>GPT-J AI Chatbot</title>
     <script src="https://unpkg.com/brain.js"></script>
+    <script type="module">
+        import { pipeline } from "@xenova/transformers";
+
+        // Load GPT-J model
+        const generator = await pipeline("text-generation", "Xenova/gpt-j-6B");
+
+        async function getGPTJResponse(prompt) {
+            const result = await generator(prompt, { max_length: 100 });
+            return result[0].generated_text;
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const chatbox = document.getElementById("chatbox");
+            const userInput = document.getElementById("user-input");
+            const sendBtn = document.getElementById("send-btn");
+
+            const net = new brain.recurrent.LSTM({ gpu: true });
+
+            let trainingData = JSON.parse(localStorage.getItem("aiData")) || [
+                { input: "hello", output: "Hi!" },
+                { input: "how are you", output: "I'm good, you?" }
+            ];
+
+            net.train(trainingData, { iterations: 300 });
+
+            function appendMessage(sender, message, className) {
+                const msgDiv = document.createElement("div");
+                msgDiv.textContent = `${sender}: ${message}`;
+                msgDiv.classList.add("message", className);
+                chatbox.appendChild(msgDiv);
+                chatbox.scrollTop = chatbox.scrollHeight;
+            }
+
+            sendBtn.addEventListener("click", async () => {
+                const userMessage = userInput.value.trim().toLowerCase();
+                if (!userMessage) return;
+
+                appendMessage("You", userMessage, "user");
+                userInput.value = "";
+
+                let aiResponse = net.run(userMessage) || await getGPTJResponse(userMessage);
+                appendMessage("AI", aiResponse, "ai");
+
+                trainingData.push({ input: userMessage, output: aiResponse });
+                net.train(trainingData, { iterations: 100 });
+                localStorage.setItem("aiData", JSON.stringify(trainingData));
+            });
+        });
+    </script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
         #chatbox { width: 90%; max-width: 400px; height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin: auto; }
@@ -16,53 +65,9 @@
     </style>
 </head>
 <body>
-    <h2>Brain.js AI Chatbot (Learning Memory)</h2>
+    <h2>GPT-J AI Chatbot (Self-Learning)</h2>
     <div id="chatbox"></div>
-    <input type="text" id="user-input" placeholder="Type a message...">
+    <input type="text" id="user-input" placeholder="Type anything...">
     <button id="send-btn">Send</button>
-    
-    <script>
-        const chatbox = document.getElementById("chatbox");
-        const userInput = document.getElementById("user-input");
-        const sendBtn = document.getElementById("send-btn");
-
-        // Initialize neural network with GPU acceleration
-        const net = new brain.recurrent.LSTM({ gpu: true });
-
-        // Load saved training data or start with a default dataset
-        let trainingData = JSON.parse(localStorage.getItem("aiData")) || [
-            { input: "hello", output: "Hi!" },
-            { input: "how are you", output: "I'm good, you?" },
-            { input: "tell me a joke", output: "Why do cows wear bells? Because their horns don't work!" },
-            { input: "bye", output: "See you!" },
-            { input: "favorite color", output: "I like blue." }
-        ];
-
-        net.train(trainingData, { iterations: 300 });
-
-        function appendMessage(sender, message, className) {
-            const msgDiv = document.createElement("div");
-            msgDiv.textContent = `${sender}: ${message}`;
-            msgDiv.classList.add("message", className);
-            chatbox.appendChild(msgDiv);
-            chatbox.scrollTop = chatbox.scrollHeight;
-        }
-
-        sendBtn.addEventListener("click", () => {
-            const userMessage = userInput.value.trim().toLowerCase();
-            if (!userMessage) return;
-
-            appendMessage("You", userMessage, "user");
-            userInput.value = "";
-
-            const aiResponse = net.run(userMessage) || "I don't understand yet, but I'm learning!";
-            appendMessage("AI", aiResponse, "ai");
-
-            // Update training memory with user input
-            trainingData.push({ input: userMessage, output: aiResponse });
-            net.train(trainingData, { iterations: 100 }); // Retrain with new data
-            localStorage.setItem("aiData", JSON.stringify(trainingData)); // Save updated dataset
-        });
-    </script>
 </body>
 </html>
